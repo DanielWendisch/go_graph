@@ -7,6 +7,6 @@ make_mock_go() |>
   ggsave("go_graph.png", plot = _, width = 14, height = 12, dpi = 150)
 
 # tweak it, then keep adding ggplot layers
-make_mock_go() |>
+p <- make_mock_go() |>
   go_graph(twist = 12, wedge_alpha = 0.25) +
   labs(title = "GO enrichment")

@@ -1,4 +1,5 @@
 # go_graph(): radial GO-enrichment tree as a ggplot.
+# (tree_graph.R builds on the same layout for categorical data.)
 #
 #   library(ggplot2); source("go_graph.R")
 #   go |> go_graph()                                  # defaults
@@ -37,8 +38,12 @@ go_palette <- c("#a1dab4", "#5ec4b6", "#2c9fc3", "#2f6db5", "#3b3a9e", "#2a1a63"
 #' @param palette         colours for the -log10(p) scale, low -> high
 #' @param wedge_alpha     opacity of the parent slices (0 = hidden, 1 = solid)
 #' @param text_size       size of the term labels; other labels scale from it
+#' @param label_room      empty space around the term labels, in plot units
 #' @param radii           ring radii: parent label end, subcategory, term
 #' @param gaps            empty angular slots between parents / subcategories
+#' @param wedge_pad       how far a parent's slice overhangs its terms (slots)
+#' @param label_pos       where parent / subcategory labels sit along their
+#'                        line (0 = inner end, 1 = outer end)
 #' @return a ggplot object
 go_graph <- function(data,
                      parent      = "parent_term",
@@ -52,18 +57,24 @@ go_graph <- function(data,
                      palette     = go_palette,
                      wedge_alpha = 0.38,
                      text_size   = 3.4,
+                     label_room  = 3.4,
                      radii       = c(parent = 3.8, subnode = 5.9, child = 7.1),
-                     gaps        = c(parent = 1, sub = 0.4)) {
+                     gaps        = c(parent = 1, sub = 0.4),
+                     wedge_pad   = 0.35,
+                     label_pos   = c(parent = 0.58, sub = 0.6)) {
 
   d    <- go_prepare(data, parent, subcategory, term, p, count, max_per_subnode)
-  tree <- go_layout(d, radii, gaps, twist, agg)
-  go_draw(tree, palette, wedge_alpha, text_size)
+  tree <- go_layout(d, radii, gaps, twist, agg, wedge_pad, label_pos)
+  go_draw(tree, palette, wedge_alpha, text_size, label_room)
 }
 
 # ---- 1. validate + tidy the input --------------------------------------------
+# `p` / `count` may be NULL (tree_graph has no numbers); `keep` names extra
+# columns to carry through the re-ordering.
 go_prepare <- function(data, parent, subcategory, term, p, count,
-                       max_per_subnode) {
-  missing_cols <- setdiff(c(parent, term, p, count), names(data))
+                       max_per_subnode, colour_fun = function(p) -log10(p),
+                       keep = NULL) {
+  missing_cols <- setdiff(c(parent, term, p, count, keep), names(data))
   if (length(missing_cols)) {
     stop("Column(s) not found in `data`: ",
          paste(missing_cols, collapse = ", "),
@@ -72,11 +83,12 @@ go_prepare <- function(data, parent, subcategory, term, p, count,
 
   d <- data.frame(parent = as.character(data[[parent]]),
                   term   = as.character(data[[term]]),
-                  p      = as.numeric(data[[p]]),
-                  n      = as.numeric(data[[count]]),
+                  p      = if (is.null(p)) 1 else as.numeric(data[[p]]),
+                  n      = if (is.null(count)) 1 else as.numeric(data[[count]]),
                   stringsAsFactors = FALSE)
   d$subcat <- if (subcategory %in% names(data)) as.character(data[[subcategory]])
               else NA_character_
+  for (k in keep) d[[k]] <- data[[k]]
 
   if (anyNA(d[c("parent", "term", "p", "n")])) {
     stop("`", parent, "`, `", term, "`, `", p, "` and `", count,
@@ -84,9 +96,9 @@ go_prepare <- function(data, parent, subcategory, term, p, count,
   }
   if (any(d$p <= 0)) {                      # p = 0 would give -log10(p) = Inf
     d$p[d$p <= 0] <- min(d$p[d$p > 0]) / 10
-    message("go_graph: p-values of 0 were set to ", format(min(d$p) , digits = 2))
+    message("go_graph: p-values of 0 were set to ", format(min(d$p), digits = 2))
   }
-  d$logp   <- -log10(d$p)
+  d$value  <- colour_fun(d$p)
   d$parent <- factor(d$parent, levels = unique(d$parent))   # keep input order
 
   if (all(is.na(d$subcat))) {
@@ -131,7 +143,7 @@ go_layout <- function(d, radii, gaps, twist, agg, wedge_pad = 0.35,
   subs$theta <- as.numeric(tapply(d$theta, d$sub_id, mean)[subs$sub_id])
   pars <- data.frame(parent = levels(d$parent))
   pars$theta <- as.numeric(tapply(subs$theta, subs$parent, mean)[pars$parent])
-  pars$logp  <- as.numeric(tapply(d$logp, d$parent, agg)[pars$parent])
+  pars$value <- as.numeric(tapply(d$value, d$parent, agg)[pars$parent])
 
   # twist: ring i is rotated by i * twist degrees; a continuous function of
   # radius, so lines become smooth spirals
@@ -190,7 +202,7 @@ go_layout <- function(d, radii, gaps, twist, agg, wedge_pad = 0.35,
     r  <- seq(0, R, length.out = k)
     a  <- c(lo + tw(r), seq(lo, hi, length.out = k) + tw(R), rev(hi + tw(r)))
     rad <- c(r, rep(R, k), rev(r))
-    data.frame(x = rad * cos(a), y = rad * sin(a), id = i, logp = pars$logp[i])
+    data.frame(x = rad * cos(a), y = rad * sin(a), id = i, value = pars$value[i])
   }
   wedges <- do.call(rbind, lapply(seq_len(nrow(pars)), wedge))
 
@@ -199,40 +211,41 @@ go_layout <- function(d, radii, gaps, twist, agg, wedge_pad = 0.35,
 }
 
 # ---- 3. draw ------------------------------------------------------------------
-go_draw <- function(tree, palette, wedge_alpha, text_size) {
+# Text with a halo: copies nudged around a circle sit under the real text (the
+# halo colour is read from a `halo` column), so the line behind the label looks
+# interrupted. Shared with tree_graph().
+halo_text <- function(data, size, colour, fontface = "plain", r = 0.09) {
+  ang <- seq(0, 2 * pi, length.out = 13)[-13]
+  halos <- lapply(ang, function(a) {
+    dx <- r * cos(a); dy <- r * sin(a)
+    geom_text(data = data, size = size, fontface = fontface,
+              aes(.data$lx + dx, .data$ly + dy, label = .data$label,
+                  angle = .data$lab_angle, colour = I(.data$halo)))
+  })
+  c(halos, list(geom_text(data = data, size = size, fontface = fontface,
+                          colour = colour,
+                          aes(.data$lx, .data$ly, label = .data$label,
+                              angle = .data$lab_angle))))
+}
+
+go_draw <- function(tree, palette, wedge_alpha, text_size, label_room) {
   terms <- tree$terms; subs <- tree$subs; pars <- tree$pars
   ink <- "#1f2a37"; sub_ink <- "#475569"; muted <- "#8d99a6"
-  lims <- range(c(terms$logp, pars$logp))
+  lims <- range(c(terms$value, pars$value))
 
   # a label's halo has the colour of the slice underneath it
   tint <- function(v) {
     rgb_val <- col2rgb(scales::col_numeric(palette, lims)(v))
     rgb(t(wedge_alpha * rgb_val + (1 - wedge_alpha) * 255), maxColorValue = 255)
   }
-  pars$halo <- tint(pars$logp)
+  pars$halo <- tint(pars$value)
   subs$halo <- pars$halo[match(subs$parent, pars$parent)]
 
-  # text with a halo: copies nudged around a circle sit under the real text, so
-  # the line behind it looks interrupted by the label
-  halo_text <- function(data, size, colour, fontface = "plain", r = 0.09) {
-    ang <- seq(0, 2 * pi, length.out = 13)[-13]
-    halos <- lapply(ang, function(a) {
-      dx <- r * cos(a); dy <- r * sin(a)
-      geom_text(data = data, size = size, fontface = fontface,
-                aes(.data$lx + dx, .data$ly + dy, label = .data$label,
-                    angle = .data$lab_angle, colour = I(.data$halo)))
-    })
-    c(halos, list(geom_text(data = data, size = size, fontface = fontface,
-                            colour = colour,
-                            aes(.data$lx, .data$ly, label = .data$label,
-                                angle = .data$lab_angle))))
-  }
-
-  lim <- tree$radii[["child"]] + 3.4
+  lim <- tree$radii[["child"]] + label_room
 
   ggplot() +
     geom_polygon(data = tree$wedges, alpha = wedge_alpha, colour = NA,
-                 aes(.data$x, .data$y, group = .data$id, fill = .data$logp)) +
+                 aes(.data$x, .data$y, group = .data$id, fill = .data$value)) +
     geom_path(data = tree$edges, colour = muted, linewidth = 0.75,
               lineend = "round", aes(.data$x, .data$y, group = .data$id)) +
     halo_text(pars, size = text_size - 0.1, colour = ink, fontface = "bold") +
@@ -240,7 +253,7 @@ go_draw <- function(tree, palette, wedge_alpha, text_size) {
     geom_point(data = subs, colour = muted, size = 2.6,
                aes(.data$x, .data$y)) +
     geom_point(data = terms,
-               aes(.data$x, .data$y, colour = .data$logp, size = .data$n)) +
+               aes(.data$x, .data$y, colour = .data$value, size = .data$n)) +
     geom_text(data = terms, size = text_size, colour = ink, vjust = 0.5,
               aes(.data$lx, .data$ly, label = .data$label,
                   angle = .data$lab_angle, hjust = .data$lab_hjust)) +
