@@ -1,10 +1,10 @@
 theme,subcategory,title,year,role,journal,doi,role_check
-COVID-19 immunology,Myeloid cells,Dysregulated myeloid compartment,2020,Joint first author,Cell,10.1016/j.cell.2020.08.001,confirmed: equal-contribution footnote (author 12/71)
-COVID-19 immunology,Myeloid cells,Profibrotic macrophages,2021,Joint first author,Cell,10.1016/j.cell.2021.11.033,confirmed: equal-contribution footnote (author 1/62)
-COVID-19 immunology,Myeloid cells,lincRNA PIRAT in monocytes,2022,Co-author,PNAS,10.1073/pnas.2120680119,confirmed: footnote covers authors 1-2 only (author 8/27)
-COVID-19 immunology,Airway epithelium,Epithelium–immune interactions,2020,Joint first author,Nat Biotechnol,10.1038/s41587-020-0602-4,"UNVERIFIED: CV only (author 5/36, footnote not accessible)"
+Myeloid cells,Monocytes,Dysregulated myeloid compartment,2020,Joint first author,Cell,10.1016/j.cell.2020.08.001,confirmed: equal-contribution footnote (author 12/71)
+Myeloid cells,Monocytes,lincRNA PIRAT in monocytes,2022,Co-author,PNAS,10.1073/pnas.2120680119,confirmed: footnote covers authors 1-2 only (author 8/27)
+Myeloid cells,Macrophages,Macrophages recycle bacteria,2025,Co-author,Nature,10.1038/s41586-025-08629-4,"by position (author 12/17), footnote not accessible"
+Lung & airway,Epithelium,Epithelium–immune interactions,2020,Joint first author,Nat Biotechnol,10.1038/s41587-020-0602-4,"UNVERIFIED: CV only (author 5/36, footnote not accessible)"
+Lung & airway,Fibrosis,Profibrotic macrophages,2021,Joint first author,Cell,10.1016/j.cell.2021.11.033,confirmed: equal-contribution footnote (author 1/62)
 Adaptive immunity,T cells,SARS-CoV-2-reactive T cells,2020,Co-author,Nature,10.1038/s41586-020-2598-9,"UNVERIFIED: author 4/33, footnote not accessible"
 Adaptive immunity,Antibodies,Therapeutic antibody in hamsters,2020,Co-author,Cell,10.1016/j.cell.2020.09.049,by position (author 40/44)
-Clinical & systems,Proteomics,COVID-19 proteomic classifiers,2020,Co-author,Cell Syst,10.1016/j.cels.2020.05.012,"UNVERIFIED: author 3/33, footnote not accessible"
-Clinical & systems,Clinical reports,Mpox with severe anal pain,2023,Co-author,Infection,10.1007/s15010-022-01896-7,confirmed: footnote covers last two authors only (author 2/11)
-Macrophage biology,Metabolism,Macrophages recycle bacteria,2025,Co-author,Nature,10.1038/s41586-025-08629-4,"by position (author 12/17), footnote not accessible"
+Systems & clinical,Proteomics,Clinical proteomic classifiers,2020,Co-author,Cell Syst,10.1016/j.cels.2020.05.012,"UNVERIFIED: author 3/33, footnote not accessible"
+Systems & clinical,Clinical reports,Mpox with severe anal pain,2023,Co-author,Infection,10.1007/s15010-022-01896-7,confirmed: footnote covers last two authors only (author 2/11)
